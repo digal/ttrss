@@ -19,7 +19,7 @@ final class CmdController {
                     if (args.count > 1) {
                         let url = args[1]
                         replyFuture = self.subscribe(msg.recipient.chatId, to: url, on: req).map{ (sub) -> (String) in
-                            return "\(sub.id): \(sub.url)"
+                            return "\(sub.listDescription())"
                         }
                     } else {
                         replyFuture = req.future("Format: /add [feed url]")
@@ -38,7 +38,7 @@ final class CmdController {
                         } else {
                             var reply = ""
                             for sub in subs {
-                                reply += "\(sub.id): \(sub.url)\n";
+                                reply += "\(sub.listDescription())\n";
                             }
                             return reply.trimmingCharacters(in: CharacterSet.newlines)
                         }

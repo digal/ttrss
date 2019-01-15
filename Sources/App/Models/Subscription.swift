@@ -14,6 +14,10 @@ final class Subscription: PostgreSQLModel {
         self.url = url
         self.chatId = chatId
     }
+    
+    func listDescription() -> String {
+        return "\(self.id ?? -1): \(self.title ?? self.url)"
+    }
 }
 
 extension Subscription: Migration { }
