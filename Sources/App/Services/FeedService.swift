@@ -91,8 +91,8 @@ final class FeedService: Service {
         return Subscription
                 .find(id, on: container).flatMap{ (sub) -> EventLoopFuture<[FeedEntry]> in
                     if let sub = sub,
-                        let url = URL(string: sub.url) {
-                        let parser = FeedParser(URL: url)
+                        let url = URL(string: sub.url),
+                        let parser = FeedParser(URL: url) {
                         let promise = container.eventLoop.newPromise(of: [FeedEntry].self)
                         parser.parseAsync(result: { (result) in
                             let entries: [FeedEntry]
