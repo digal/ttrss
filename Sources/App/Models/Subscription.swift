@@ -15,3 +15,5 @@ final class Subscription: PostgreSQLModel {
         self.chatId = chatId
     }
 }
+
+extension Subscription: Migration { }

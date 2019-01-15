@@ -28,5 +28,9 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     var databases = DatabasesConfig()
     databases.add(database: postgre, as: .psql)
     services.register(databases)
+    
+    var migrations = MigrationConfig()
+    migrations.add(model: Subscription.self, database: .psql)
+    services.register(migrations)
 
 }
