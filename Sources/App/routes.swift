@@ -12,6 +12,9 @@ public func routes(_ router: Router) throws {
         return "Hello, world!"
     }
 
+    let cmdController = CmdController()
+    router.post("tt_callback", use: cmdController.handleMessage)
+
 //    // Example of configuring a controller
 //    let todoController = TodoController()
 //    router.get("todos", use: todoController.index)
