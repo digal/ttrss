@@ -7,7 +7,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/vapor.git", from: "3.0.0"),
         .package(url: "https://github.com/vapor/fluent-postgresql.git", from: "1.0.0"),
         .package(url: "https://github.com/BrettRToomey/Jobs.git", from: "1.1.2"),
-        .package(url: "https://github.com/nmdias/FeedKit.git", .revision("4a7b7a9a43f90c02873440209362094a3ec0c63e"))
+        .package(url: "https://github.com/nmdias/FeedKit.git", from:"8.0.0")
     ],
     targets: [
         .target(name: "App", dependencies: ["FluentPostgreSQL", "Vapor", "Jobs", "FeedKit"]),
