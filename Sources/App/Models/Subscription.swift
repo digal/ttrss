@@ -7,7 +7,9 @@ final class Subscription: PostgreSQLModel {
     var title: String? = nil
     var url: String
     var chatId: Int
-
+    var lastItemSeen: Date = Date(timeIntervalSince1970: 0)
+    var lastUpdated: Date = Date(timeIntervalSince1970: 0)
+    
     /// Creates a new `Todo`.
     init(url: String, chatId: Int) {
         self.id = nil
@@ -20,4 +22,4 @@ final class Subscription: PostgreSQLModel {
     }
 }
 
-extension Subscription: Migration { }
+extension Subscription: PostgreSQLMigration { }

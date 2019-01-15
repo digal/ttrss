@@ -32,5 +32,6 @@ public func configure(_ config: inout Config, _ env: inout Environment, _ servic
     var migrations = MigrationConfig()
     migrations.add(model: Subscription.self, database: .psql)
     services.register(migrations)
-
+    
+    try services.register(FeedServiceProvider())
 }
