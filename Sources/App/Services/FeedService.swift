@@ -72,8 +72,9 @@ final class FeedService: Service {
         container.withPooledConnection(to: .psql) { (conn) -> EventLoopFuture<Void> in
             Subscription.query(on: conn).all().whenSuccess { (subs) in
                 for subscription in subs {
-                    if let id = subscription.id {
-                        self.updateFeed(id: id, on: conn).whenSuccess{ (entries) in
+                    if let id = subscription.id,
+                        let client = try? container.client() {
+                        self.updateFeed(id: id, on: conn, client: client).whenSuccess{ (entries) in
                             print("entries: \(entries.map { $0.asMessage().text })")
                             for entry in entries {
                                 self.send(on: container, chatId: subscription.chatId, msg: entry.asMessage(), credentials: creds)
@@ -92,16 +93,18 @@ final class FeedService: Service {
         }
     }
     
-    func updateFeed(id: Int, on container: DatabaseConnectable) -> Future<[FeedEntry]> {
+    func updateFeed(id: Int, on container: DatabaseConnectable, client: Client) -> Future<[FeedEntry]> {
         return Subscription
                 .find(id, on: container).flatMap{ (sub) -> EventLoopFuture<[FeedEntry]> in
-                    if let sub = sub,
-                        let url = URL(string: sub.url),
-                        let parser = FeedParser(URL: url) {
-                        let promise = container.eventLoop.newPromise(of: [FeedEntry].self)
-                        parser.parseAsync(result: { (result) in
-                            let entries: [FeedEntry]
-                            switch result {
+                    guard let sub = sub else { return container.future([]) }
+                    return client.get(sub.url).flatMap{ (resp) -> EventLoopFuture<[FeedEntry]> in
+                        if let data = resp.http.body.data,
+                            let parser = FeedParser(data: data) {
+                            
+                            let promise = container.eventLoop.newPromise(of: [FeedEntry].self)
+                            parser.parseAsync(result: { (result) in
+                                let entries: [FeedEntry]
+                                switch result {
                                 case let .atom(feed):
                                     entries = (feed.entries ?? []).map{ FeedEntry(with: $0) }
                                 case let .rss(feed):
@@ -111,35 +114,37 @@ final class FeedService: Service {
                                 case let .failure(error):
                                     promise.fail(error: error)
                                     return
-                            }
-                            
-                            print("\(url): \(entries.count)" )
-                            if (entries.count > 0) {
-                                container.transaction(on: .psql, { (conn) -> EventLoopFuture<[FeedEntry]> in
-                                    return Subscription.find(id, on: conn).flatMap { (sub) -> EventLoopFuture<[FeedEntry]> in
-                                        if let sub = sub {
-                                            sub.lastUpdated = Date()
-                                            var newEntries: [FeedEntry] = []
-                                            for entry in entries {
-                                                if (entry.date > sub.lastItemSeen) {
-                                                    sub.lastItemSeen = entry.date
-                                                    newEntries.append(entry)
+                                }
+                                
+                                print("\(sub.url): \(entries.count)" )
+                                if (entries.count > 0) {
+                                    container.transaction(on: .psql, { (conn) -> EventLoopFuture<[FeedEntry]> in
+                                        return Subscription.find(id, on: conn).flatMap { (sub) -> EventLoopFuture<[FeedEntry]> in
+                                            if let sub = sub {
+                                                sub.lastUpdated = Date()
+                                                var newEntries: [FeedEntry] = []
+                                                for entry in entries {
+                                                    if (entry.date > sub.lastItemSeen) {
+                                                        sub.lastItemSeen = entry.date
+                                                        newEntries.append(entry)
+                                                    }
                                                 }
+                                                return sub.save(on: conn).transform(to: newEntries)
+                                            } else {
+                                                return conn.eventLoop.future([])
                                             }
-                                            return sub.save(on: conn).transform(to: newEntries)
-                                        } else {
-                                            return conn.eventLoop.future([])
                                         }
-                                    }
-                                }).whenSuccess(promise.succeed)
-                            } else {
-                                promise.succeed(result: entries)
-                            }
-                        })
-                        
-                        return promise.futureResult
-                    } else {
-                        return container.future([])
+                                    }).whenSuccess(promise.succeed)
+                                } else {
+                                    promise.succeed(result: entries)
+                                }
+                            })
+                            
+                            return promise.futureResult
+                            
+                        } else {
+                            return container.future([])
+                        }
                     }
                 }
     }
@@ -184,8 +189,6 @@ final class FeedService: Service {
             }
         }
     }
-    
-    
 }
 
 final class FeedServiceProvider: Provider {
