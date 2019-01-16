@@ -14,6 +14,8 @@ final class CmdController {
             let replyFuture: Future<String?>
 
             if let text = msg.message.text {
+                print("got message: \(text)")
+                fflush(stdout)
                 let args = text.components(separatedBy: CharacterSet.whitespacesAndNewlines)
                 if (text.starts(with: "/add")) {
                     if (args.count > 1) {
