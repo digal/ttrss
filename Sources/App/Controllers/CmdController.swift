@@ -78,8 +78,12 @@ final class CmdController {
     }
     
     func subscribe(_ chatId: Int, to url: String, on req: Request) -> Future<Subscription> {
-        let sub = Subscription(url: url, chatId: chatId)
-        return sub.save(on: req)
+        do {
+            let feedService = try req.make(FeedService.self)
+            return feedService.subscribe(chatId, to: url, on: req)
+        } catch {
+            return req.future(error: error)
+        }
     }
 
     func unsubscribe(_ chatId: Int, subId: Int, on req: Request) -> Future<Void> {
