@@ -122,7 +122,7 @@ final class FeedService: Service {
                                             for entry in entries {
                                                 if (entry.date > sub.lastItemSeen) {
                                                     sub.lastItemSeen = entry.date
-                                                    newEntries += entries
+                                                    newEntries.append(entry)
                                                 }
                                             }
                                             return sub.save(on: conn).transform(to: newEntries)
@@ -152,7 +152,7 @@ final class FeedServiceProvider: Provider {
     }
     
     func didBoot(_ container: Container) throws -> EventLoopFuture<Void> {
-        Jobs.add(interval: .seconds(10)) {
+        Jobs.add(interval: .seconds(1800)) {
             self.feedService.udpateFeeds(on: container, creds: try! container.make(Credentials.self))
         }
         return container.eventLoop.future()
