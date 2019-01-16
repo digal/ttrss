@@ -55,17 +55,18 @@ final class FeedService: Service {
     
     func send(on worker: Worker, chatId: Int, msg: OutgoingMessage, credentials: Credentials) {
         HTTPClient.connect(scheme: .https,
-                          hostname: credentials.host,
-                          on: worker).flatMap { (client) -> EventLoopFuture<Void> in
+                           hostname: credentials.host,
+                           on: worker).flatMap { (client) -> EventLoopFuture<Void> in
                                 let outgoingJson = try! JSONEncoder().encode(msg)
                                 let msgRequest = HTTPRequest(method: .POST, url: "/messages?access_token=\(credentials.token)&chat_id=\(chatId)", body: outgoingJson)
                                 return client.send(msgRequest).do{ (resp) in
                                             print("msg send response: \(resp.body)")
                                             fflush(stdout)
-                                        }.catch { (err) in
-                                            print("reply error: \(err)")
-                                            fflush(stdout)
                                         }.transform(to: ())
+                            }.catch { (err) in
+                                print("reply error: \(err)")
+                                print("host: \(credentials.host)")
+                                fflush(stdout)
                             }.whenComplete {
                                 print("complete")
                             }
@@ -149,7 +150,7 @@ final class FeedServiceProvider: Provider {
     
     func didBoot(_ container: Container) throws -> EventLoopFuture<Void> {
         return container.withPooledConnection(to: .psql) { (conn) -> EventLoopFuture<Void> in
-            Jobs.add(interval: .seconds(1800)) {
+            Jobs.add(interval: .seconds(10)) {
                 self.feedService.udpateFeeds(on: conn, creds: try! container.make(Credentials.self))
             }
             return container.eventLoop.future()

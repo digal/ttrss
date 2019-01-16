@@ -26,10 +26,14 @@ final class CmdController {
                     }
                 } else if (text.starts(with: "/remove")) {
                     if (args.count > 1) {
-                        let url = args[1]
-                        replyFuture = req.future("Removed feed \(url)")
+                        let subIdStr = args[1]
+                        if let subId = Int(subIdStr) {
+                            replyFuture = self.unsubscribe(msg.recipient.chatId, subId: subId, on: req).transform(to: "Subscription deleted")
+                        } else {
+                            replyFuture = req.future("Invalid subscription id")
+                        }                        
                     } else {
-                        replyFuture = req.future("Format: /remove [feed url]")
+                        replyFuture = req.future("Format: /remove [feed id]")
                     }
                 } else if (text.starts(with: "/list")) {
                     replyFuture = try self.listSubscriptionsFor(msg.recipient.chatId, on: req).map({ (subs) -> (String) in
@@ -85,6 +89,17 @@ final class CmdController {
     func subscribe(_ chatId: Int, to url: String, on req: Request) -> Future<Subscription> {
         let sub = Subscription(url: url, chatId: chatId)
         return sub.save(on: req)
+    }
+
+    func unsubscribe(_ chatId: Int, subId: Int, on req: Request) -> Future<Void> {
+        return Subscription.find(subId, on: req).flatMap{ (subOpt) -> EventLoopFuture<Void> in
+            if let sub = subOpt,
+                sub.chatId == chatId {
+                return sub.delete(on: req)
+            } else {
+                return req.eventLoop.future()
+            }
+        }
     }
 
     func listSubscriptionsFor(_ chatId: Int, on req: Request) throws -> Future<[Subscription]> {
