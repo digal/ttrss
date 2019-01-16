@@ -48,7 +48,7 @@ final class CmdController {
                         }
                     })
                 } else {
-                    replyFuture = req.future("/add [feed url] - subscribe feed\n/remove [feed url] - unsubscribe feed\n/list - list subscriptions")
+                    replyFuture = req.future("/add [feed url] - subscribe feed\n/remove [feed id] - unsubscribe feed\n/list - list subscriptions")
                 }
             } else {
                 replyFuture = req.future(nil)
