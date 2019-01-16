@@ -31,7 +31,7 @@ final class CmdController {
                             replyFuture = self.unsubscribe(msg.recipient.chatId, subId: subId, on: req).transform(to: "Subscription deleted")
                         } else {
                             replyFuture = req.future("Invalid subscription id")
-                        }                        
+                        }
                     } else {
                         replyFuture = req.future("Format: /remove [feed id]")
                     }
@@ -60,23 +60,14 @@ final class CmdController {
                     
                     let credentials = try req.make(Credentials.self)
                     
-                    return HTTPClient.connect(scheme: .https,
-                                              hostname: credentials.host,
-                                              on: req).flatMap { (client) -> EventLoopFuture<HTTPStatus> in
-                                                let outgoingMessage = OutgoingMessage(with: reply)
-                                                let outgoingJson = try! JSONEncoder().encode(outgoingMessage)
-                                                let msgRequest = HTTPRequest(method: .POST, url: "/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)", body: outgoingJson)
-                                                return client.send(msgRequest).do{ (resp) in
-                                                    print("msg send response: \(resp.body)")
-                                                    fflush(stdout)
-                                                    }.catch { (err) in
-                                                        print("reply error: \(err)")
-                                                        fflush(stdout)
-                                                    }
-                                                    .map { (resp) -> (HTTPStatus) in
-                                                        return .ok
-                                                }
-                    }
+                    return try req.client()
+                                    .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)") { (post) in
+                                        let outgoingMessage = OutgoingMessage(with: reply)
+                                        try post.content.encode(outgoingMessage)
+                                    }.map{ (resp) in
+                                        print("msg send response: \(resp.http.body)")
+                                        return resp.http.status
+                                    }
                 } else {
                     print("no reply")
                     fflush(stdout)

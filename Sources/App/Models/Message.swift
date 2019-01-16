@@ -42,3 +42,5 @@ struct OutgoingMessage: Codable {
         self.text = text
     }
 }
+
+extension OutgoingMessage: Content {}

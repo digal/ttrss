@@ -53,38 +53,41 @@ struct FeedEntry {
 
 final class FeedService: Service {
     
-    func send(on worker: Worker, chatId: Int, msg: OutgoingMessage, credentials: Credentials) {
-        HTTPClient.connect(scheme: .https,
-                           hostname: credentials.host,
-                           on: worker).flatMap { (client) -> EventLoopFuture<Void> in
-                                let outgoingJson = try! JSONEncoder().encode(msg)
-                                let msgRequest = HTTPRequest(method: .POST, url: "/messages?access_token=\(credentials.token)&chat_id=\(chatId)", body: outgoingJson)
-                                return client.send(msgRequest).do{ (resp) in
-                                            print("msg send response: \(resp.body)")
-                                            fflush(stdout)
-                                        }.transform(to: ())
-                            }.catch { (err) in
-                                print("reply error: \(err)")
-                                print("host: \(credentials.host)")
-                                fflush(stdout)
-                            }.whenComplete {
-                                print("complete")
-                            }
-        
+    func send(on container: Container, chatId: Int, msg: OutgoingMessage, credentials: Credentials) -> Future<HTTPStatus> {
+        do {
+            return try container.client()
+                        .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(chatId)") { (post) in
+                            try post.content.encode(msg)
+                        }.map{ (resp) in
+                            print("msg send response: \(resp.http.body)")
+                            return resp.http.status
+            }
+        } catch {
+            return container.eventLoop.future(error: error)
+        }
     }
 
-    func udpateFeeds(on db: DatabaseConnectable, creds: Credentials) {
-        Subscription.query(on: db).all().whenSuccess { (subs) in
-            for subscription in subs {
-                if let id = subscription.id {
-                    self.updateFeed(id: id, on: db).whenSuccess{ (entries) in
-                        print("entries: \(entries.map { $0.asMessage().text })")
-                        for entry in entries {
-                            self.send(on: db, chatId: subscription.chatId, msg: entry.asMessage(), credentials: creds)
+    func udpateFeeds(on container: Container, creds: Credentials) {
+        container.withPooledConnection(to: .psql) { (conn) -> EventLoopFuture<Void> in
+            Subscription.query(on: conn).all().whenSuccess { (subs) in
+                for subscription in subs {
+                    if let id = subscription.id {
+                        self.updateFeed(id: id, on: conn).whenSuccess{ (entries) in
+                            print("entries: \(entries.map { $0.asMessage().text })")
+                            for entry in entries {
+                                self.send(on: container, chatId: subscription.chatId, msg: entry.asMessage(), credentials: creds)
+                                    .whenFailure{ (err) in
+                                        print("send error: \(err)");
+                                    }
+                            }
                         }
                     }
                 }
             }
+            
+            return container.eventLoop.future()
+        }.whenComplete {
+            print("udpated feeds")
         }
     }
     
@@ -149,12 +152,10 @@ final class FeedServiceProvider: Provider {
     }
     
     func didBoot(_ container: Container) throws -> EventLoopFuture<Void> {
-        return container.withPooledConnection(to: .psql) { (conn) -> EventLoopFuture<Void> in
-            Jobs.add(interval: .seconds(10)) {
-                self.feedService.udpateFeeds(on: conn, creds: try! container.make(Credentials.self))
-            }
-            return container.eventLoop.future()
+        Jobs.add(interval: .seconds(10)) {
+            self.feedService.udpateFeeds(on: container, creds: try! container.make(Credentials.self))
         }
+        return container.eventLoop.future()
     }
     
 

@@ -41,26 +41,18 @@ public final class CredentialsProvider : Provider  {
                 print("error: \(err)")
             }
         }
-        return try self.updateCredentials(container).map { (_) -> (Void) in
-            return ()
-        }
+        return try self.updateCredentials(container).transform(to: ())
     }
     
-    func updateCredentials(_ container: Container)  throws -> EventLoopFuture<HTTPResponse> {
-        return HTTPClient.connect(scheme: .https,
-                           hostname: self.host,
-                           on: container)
-            .flatMap { (client) -> EventLoopFuture<HTTPResponse> in
-                let infoRequest = HTTPRequest(method: .GET, url: "/me?access_token=\(self.token)")
-                return client.send(infoRequest)
-            }
-            .do { (resp) in
-                print("response: \(resp)")
-                if let respData = resp.body.data,
-                    let info = try? JSONDecoder().decode(BotInfo.self, from: respData) {
-                    self.credentials.info = info
-                }
-            }
-        
+    func updateCredentials(_ container: Container)  throws -> EventLoopFuture<BotInfo> {
+        print("updateCredentials")
+
+        return try container.client()
+                            .get("https://\(self.host)/me?access_token=\(self.token)")
+                            .flatMap{ (resp) -> EventLoopFuture<BotInfo> in
+                                return try resp.content.decode(BotInfo.self)
+                            }.do { (botInfo) in
+                                self.credentials.info = botInfo
+                            }
     }
 }
