@@ -10,7 +10,7 @@ import FeedKit
 import Jobs
 
 enum FeedError: Error {
-    case invalidUrl(url: String)
+    case invalidFeed(url: String)
 }
 
 struct FeedEntry {
@@ -144,15 +144,16 @@ final class FeedService: Service {
                 }
     }
     
-    public func subscribe(_ chatId: Int, to urlString: String, on req: Request) -> Future<Subscription> {
-        if let url = URL(string: urlString),
-            let parser = FeedParser(URL: url) {
-            let promise = req.eventLoop.newPromise(of: Subscription.self)
-            parser.parseAsync { (result) in
-                let entries: [FeedEntry]
-                let title: String?
-
-                switch result {
+    public func subscribe(_ chatId: Int, to urlString: String, on req: Request) throws -> Future<Subscription> {
+        return try req.client().get(urlString).flatMap{ (resp) -> EventLoopFuture<Subscription> in
+            if let data = resp.http.body.data,
+                let parser = FeedParser(data: data) {
+                let promise = req.eventLoop.newPromise(of: Subscription.self)
+                parser.parseAsync { (result) in
+                    let entries: [FeedEntry]
+                    let title: String?
+                    
+                    switch result {
                     case let .atom(feed):
                         entries = (feed.entries ?? []).map{ FeedEntry(with: $0) }
                         title = feed.title
@@ -165,21 +166,22 @@ final class FeedService: Service {
                     case let .failure(error):
                         promise.fail(error: error)
                         return
+                    }
+                    
+                    let sub = Subscription(url: urlString, chatId: chatId)
+                    sub.title = title
+                    for entry in entries {
+                        if (entry.date > sub.lastItemSeen) {
+                            sub.lastItemSeen = entry.date
+                        }
+                    }
+                    promise.succeed(result: sub)
                 }
                 
-                let sub = Subscription(url: urlString, chatId: chatId)
-                sub.title = title
-                for entry in entries {
-                    if (entry.date > sub.lastItemSeen) {
-                        sub.lastItemSeen = entry.date
-                    }
-                }
-                promise.succeed(result: sub)
+                return promise.futureResult.flatMap{ $0.save(on: req) }
+            } else {
+                return req.eventLoop.future(error: FeedError.invalidFeed(url: urlString))
             }
-            
-            return promise.futureResult.flatMap{ $0.save(on: req) }
-        } else {
-            return req.eventLoop.future(error: FeedError.invalidUrl(url: urlString))
         }
     }
     
@@ -194,7 +196,7 @@ final class FeedServiceProvider: Provider {
     }
     
     func didBoot(_ container: Container) throws -> EventLoopFuture<Void> {
-        Jobs.add(interval: .seconds(1800)) {
+        Jobs.add(interval: .seconds(600)) {
             self.feedService.udpateFeeds(on: container, creds: try! container.make(Credentials.self))
         }
         return container.eventLoop.future()
