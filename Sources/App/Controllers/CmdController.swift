@@ -21,8 +21,8 @@ final class CmdController {
                     if (args.count > 1) {
                         let url = args[1]
                         replyFuture = self.subscribe(msg.recipient.chatId, to: url, on: req).map{ (sub) -> (String) in
-                            return "\(sub.listDescription())"
-                        }
+                                        return "\(sub.listDescription())"
+                                      }
                     } else {
                         replyFuture = req.future("Format: /add [feed url]")
                     }
@@ -56,26 +56,28 @@ final class CmdController {
                 replyFuture = req.future(nil)
             }
             
-            return replyFuture.flatMap{ (reply) -> EventLoopFuture<HTTPStatus> in
-                if let reply = reply {
-                    print("reply: \(reply)")
-                    
-                    let credentials = try req.make(Credentials.self)
-                    
-                    return try req.client()
-                                    .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)") { (post) in
-                                        let outgoingMessage = OutgoingMessage(with: reply)
-                                        try post.content.encode(outgoingMessage)
-                                    }.map{ (resp) in
-                                        print("msg send response: \(resp.http.body)")
-                                        return resp.http.status
-                                    }
-                } else {
-                    print("no reply")
-                    fflush(stdout)
-                    return req.future(.ok)
-                }
-            }
+            return replyFuture.catchMap{ (error) -> (String?) in
+                        return String.init(describing: error)
+                    }.flatMap{ (reply) -> EventLoopFuture<HTTPStatus> in
+                        if let reply = reply {
+                            print("reply: \(reply)")
+                            
+                            let credentials = try req.make(Credentials.self)
+                            
+                            return try req.client()
+                                            .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)") { (post) in
+                                                let outgoingMessage = OutgoingMessage(with: reply)
+                                                try post.content.encode(outgoingMessage)
+                                            }.map{ (resp) in
+                                                print("msg send response: \(resp.http.body)")
+                                                return resp.http.status
+                                            }
+                        } else {
+                            print("no reply")
+                            fflush(stdout)
+                            return req.future(.ok)
+                        }
+                    }
         }
     }
     
