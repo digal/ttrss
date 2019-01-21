@@ -81,7 +81,7 @@ final class CmdController {
         }
     }
     
-    func subscribe(_ chatId: Int, to url: String, on req: Request) -> Future<Subscription> {
+    private func subscribe(_ chatId: Int, to url: String, on req: Request) -> Future<Subscription> {
         do {
             let feedService = try req.make(FeedService.self)
             return try feedService.subscribe(chatId, to: url, on: req)
@@ -90,7 +90,7 @@ final class CmdController {
         }
     }
 
-    func unsubscribe(_ chatId: Int, subId: Int, on req: Request) -> Future<Void> {
+    private func unsubscribe(_ chatId: Int, subId: Int, on req: Request) -> Future<Void> {
         return Subscription.find(subId, on: req).flatMap{ (subOpt) -> EventLoopFuture<Void> in
             if let sub = subOpt,
                 sub.chatId == chatId {
@@ -101,8 +101,16 @@ final class CmdController {
         }
     }
 
-    func listSubscriptionsFor(_ chatId: Int, on req: Request) throws -> Future<[Subscription]> {
+    private func listSubscriptionsFor(_ chatId: Int, on req: Request) throws -> Future<[Subscription]> {
         return Subscription.query(on: req).filter(\.chatId, .equal, chatId).all()
     }
 
+    func listSubscriptions(_ req: Request) throws -> Future<String> {
+        return Subscription.query(on: req).all().map{ (subs) -> (String) in
+            return subs.map{ (s) -> String in
+                return "\(s.chatId) - \"\(s.title ?? "")\" \(s.url)";
+            }.joined(separator: "\n")
+        }
+    }
+    
 }
