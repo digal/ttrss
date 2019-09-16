@@ -24,7 +24,7 @@ public final class Credentials: Service {
 public final class CredentialsProvider : Provider  {
     let credentials: Credentials
     let token: String
-    let host = "test2.tamtam.chat"
+    let host = "botapi.tamtam.chat"
 
     init(token: String) {
         self.token = token
