@@ -10,7 +10,7 @@ import Vapor
 final class CmdController {
     func handleMessage(_ req: Request) throws -> Future<HTTPStatus> {
         
-        print("got req: '\(req.body)'")
+        print("got req: '\(req)'")
 
         return try req.content.decode(Message.self).flatMap { msg in
             let replyFuture: Future<String?>
