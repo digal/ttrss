@@ -12,74 +12,79 @@ final class CmdController {
         
         print("got req: '\(req)'")
 
-        return try req.content.decode(Message.self).flatMap { msg in
+        return try req.content.decode(Update.self).flatMap { upd in
             let replyFuture: Future<String?>
 
-            if let text = msg.message.text {
-                print("got message: \(text)")
-                fflush(stdout)
-                let args = text.components(separatedBy: CharacterSet.whitespacesAndNewlines)
-                if (text.starts(with: "/add")) {
-                    if (args.count > 1) {
-                        let url = args[1]
-                        replyFuture = self.subscribe(msg.recipient.chatId, to: url, on: req).map{ (sub) -> (String) in
-                                        return "\(sub.listDescription())"
-                                      }
-                    } else {
-                        replyFuture = req.future("Format: /add [feed url]")
-                    }
-                } else if (text.starts(with: "/remove")) {
-                    if (args.count > 1) {
-                        let subIdStr = args[1]
-                        if let subId = Int(subIdStr) {
-                            replyFuture = self.unsubscribe(msg.recipient.chatId, subId: subId, on: req).transform(to: "Subscription deleted")
+            if let msg = upd.message {
+                if let text = msg.message.text {
+                    print("got message: \(text)")
+                    fflush(stdout)
+                    let args = text.components(separatedBy: CharacterSet.whitespacesAndNewlines)
+                    if (text.starts(with: "/add")) {
+                        if (args.count > 1) {
+                            let url = args[1]
+                            replyFuture = self.subscribe(msg.recipient.chatId, to: url, on: req).map{ (sub) -> (String) in
+                                            return "\(sub.listDescription())"
+                                          }
                         } else {
-                            replyFuture = req.future("Invalid subscription id")
+                            replyFuture = req.future("Format: /add [feed url]")
                         }
-                    } else {
-                        replyFuture = req.future("Format: /remove [feed id]")
-                    }
-                } else if (text.starts(with: "/list")) {
-                    replyFuture = try self.listSubscriptionsFor(msg.recipient.chatId, on: req).map({ (subs) -> (String) in
-                        if (subs.count == 0) {
-                            return "No subscriptions"
-                        } else {
-                            var reply = ""
-                            for sub in subs {
-                                reply += "\(sub.listDescription())\n";
+                    } else if (text.starts(with: "/remove")) {
+                        if (args.count > 1) {
+                            let subIdStr = args[1]
+                            if let subId = Int(subIdStr) {
+                                replyFuture = self.unsubscribe(msg.recipient.chatId, subId: subId, on: req).transform(to: "Subscription deleted")
+                            } else {
+                                replyFuture = req.future("Invalid subscription id")
                             }
-                            return reply.trimmingCharacters(in: CharacterSet.newlines)
-                        }
-                    })
-                } else {
-                    replyFuture = req.future("/add [feed url] - subscribe feed\n/remove [feed id] - unsubscribe feed\n/list - list subscriptions")
-                }
-            } else {
-                replyFuture = req.future(nil)
-            }
-            
-            return replyFuture.catchMap{ (error) -> (String?) in
-                        return String.init(describing: error)
-                    }.flatMap{ (reply) -> EventLoopFuture<HTTPStatus> in
-                        if let reply = reply {
-                            print("reply: \(reply)")
-                            
-                            let credentials = try req.make(Credentials.self)
-                            
-                            return try req.client()
-                                            .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)") { (post) in
-                                                let outgoingMessage = OutgoingMessage(with: reply)
-                                                try post.content.encode(outgoingMessage)
-                                            }.map{ (resp) in
-                                                print("msg send response: \(resp.http.body)")
-                                                return resp.http.status
-                                            }
                         } else {
-                            print("no reply")
-                            fflush(stdout)
-                            return req.future(.ok)
+                            replyFuture = req.future("Format: /remove [feed id]")
                         }
+                    } else if (text.starts(with: "/list")) {
+                        replyFuture = try self.listSubscriptionsFor(msg.recipient.chatId, on: req).map({ (subs) -> (String) in
+                            if (subs.count == 0) {
+                                return "No subscriptions"
+                            } else {
+                                var reply = ""
+                                for sub in subs {
+                                    reply += "\(sub.listDescription())\n";
+                                }
+                                return reply.trimmingCharacters(in: CharacterSet.newlines)
+                            }
+                        })
+                    } else {
+                        replyFuture = req.future("/add [feed url] - subscribe feed\n/remove [feed id] - unsubscribe feed\n/list - list subscriptions")
                     }
+                } else {
+                    replyFuture = req.future(nil)
+                }
+                
+                return replyFuture.catchMap{ (error) -> (String?) in
+                            return String.init(describing: error)
+                        }.flatMap{ (reply) -> EventLoopFuture<HTTPStatus> in
+                            if let reply = reply {
+                                print("reply: \(reply)")
+                                
+                                let credentials = try req.make(Credentials.self)
+                                
+                                return try req.client()
+                                                .post("https://\(credentials.host)/messages?access_token=\(credentials.token)&chat_id=\(msg.recipient.chatId)") { (post) in
+                                                    let outgoingMessage = OutgoingMessage(with: reply)
+                                                    try post.content.encode(outgoingMessage)
+                                                }.map{ (resp) in
+                                                    print("msg send response: \(resp.http.body)")
+                                                    return resp.http.status
+                                                }
+                            } else {
+                                print("no reply")
+                                fflush(stdout)
+                                return req.future(.ok)
+                            }
+                        }
+            } else {
+                print("no msg")
+                return req.future(.ok)
+            }
         }
     }
     

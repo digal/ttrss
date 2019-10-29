@@ -29,7 +29,7 @@ struct MsgContent: Codable {
 }
 
 struct Message: Codable {
-    var sender: Sender?
+    var sender: Sender
     var recipient: Recipient
     var message: MsgContent
     var timestamp: Int
