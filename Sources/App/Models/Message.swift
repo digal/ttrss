@@ -31,7 +31,7 @@ struct MsgContent: Codable {
 struct Message: Codable {
     var sender: Sender
     var recipient: Recipient
-    var message: MsgContent
+    var body: MsgContent
     var timestamp: Int
 }
 

@@ -16,7 +16,7 @@ final class CmdController {
             let replyFuture: Future<String?>
 
             if let msg = upd.message {
-                if let text = msg.message.text {
+                if let text = msg.body.text {
                     print("got message: \(text)")
                     fflush(stdout)
                     let args = text.components(separatedBy: CharacterSet.whitespacesAndNewlines)
